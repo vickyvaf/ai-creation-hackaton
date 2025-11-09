@@ -1,0 +1,1032 @@
+{
+  "name": "Agent Swarm",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.message }}User request:{{ $json.body.message }}\nAnalyze the request and:\n1. If it's a question → answer directly with your knowledge\n2. If it needs current info (flights, weather, news) → use web search\n3. If it's a task (create event, send email) → use appropriate tool\n4. If unclear → ask for clarification\n\nRespond naturally and helpfully.always answer in bahasa indonesia{\n  \"uang_yg_terpakai\": \"-15000\",\n  \"di_gunakan_untuk\": \"Iklan Facebook\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}const amount = input[\"uang_yg_terpakai\"];      // Get exact value: \"-15000\"\nconst description = input[\"di_gunakan_untuk\"];  // Get exact text: \"Iklan Facebook\"\nconst date = input[\"waktu_penggunaan\"];         // Get exact date: \"2025-11-09\"a conversational financial assistant that understands casual Indonesian commands about money transactions. You parse user requests and delegate to the Money Management Sub-Agent.\n\nCommand Recognition Patterns\nPattern 1: Casual Transaction Mention\nExamples:\n\n\"catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000\"\n\"tadi saya beli kopi 25rb\"\n\"habis bayar iklan facebook 500 ribu\"\n\"dapat transfer dari klien 2 juta\"\n\nExtract:\n\nAmount: numbers mentioned (15.000, 25rb, 500 ribu, 2 juta)\nDescription: activity mentioned (makan siang, beli kopi, iklan facebook, transfer)\nTime: time mentioned (pukul 8 a m, tadi, habis)\n\nPattern 2: Direct Recording Request\nExamples:\n\n\"catat pengeluaran 50rb untuk bensin\"\n\"input pemasukan 1 juta sales\"\n\"tambahkan expense marketing 300k\"\n\nPattern 3: Question Format\nExamples:\n\n\"berapa sisa budget marketing?\"\n\"total pengeluaran bulan ini?\"\n\"saldo saya sekarang berapa?\"\n\n\nParsing Logic for Casual Commands\nStep 1: Detect Transaction Intent\nKeywords that indicate transaction:\n\ncatat, input, tambah, record, add\nbaru saja, tadi, habis, just\nbeli, bayar, dapat, terima, transfer\nmakan, kopi, iklan, sewa, etc.\n\nStep 2: Extract Amount\nRecognize various Indonesian number formats:\n\n\"15.000\" → 15000\n\"15rb\" / \"15k\" → 15000\n\"1,5jt\" / \"1.5 juta\" → 1500000\n\"500ribu\" → 500000\n\"2 jt\" → 2000000\n\nConversion Rules:\nrb / ribu / k → × 1,000\njt / juta / million → × 1,000,000\nStep 3: Extract Description\nLook for activity keywords:\n\nFood: makan, kopi, lunch, dinner, breakfast, sarapan, minum\nAds: iklan, ads, promosi, campaign, facebook, google, instagram\nShopping: beli, belanja, shopping, purchase\nBills: bayar, listrik, internet, air, telepon\nIncome: dapat, terima, transfer, payment, sales\n\nStep 4: Determine Type\nExpense indicators:\n\nbeli, bayar, habis, spent, buat, untuk\nmakan, iklan, belanja, etc.\n\nIncome indicators:\n\ndapat, terima, received, payment, transfer masuk, sales\n\nStep 5: Extract/Infer Time\n\n\"pukul 8 a m\" → 08:00\n\"tadi pagi\" → today morning\n\"kemarin\" → yesterday\n\"habis\" / \"baru saja\" → just now (current time)\nNo time mentioned → current date/time\n\nStep 6: Format for Sub-Agent\nConvert to structured format:\njson{\n  \"uang_yg_terpakai\": \"-15000\",\n  \"di_gunakan_untuk\": \"Makan siang\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\n\nParsing Examples\nExample 1: Casual Food Expense\nUser: \"catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000\"\nYour Parsing:\n1. Detect intent: \"catat\" + \"makan siang\" = transaction\n2. Extract amount: \"15.000\" → 15000\n3. Extract description: \"makan siang\"\n4. Determine type: \"makan\" = expense (food)\n5. Extract time: \"pukul 8 a m\" = 08:00 AM today\n6. Determine sign: expense = negative\nOutput to Sub-Agent:\njson{\n  \"uang_yg_terpakai\": \"-15000\",\n  \"di_gunakan_untuk\": \"Makan siang\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\nResponse to User:\nBaik, saya catat pengeluaran untuk makan siang Rp 15.000 di pukul 08:00 pagi ini. \nSedang memproses ke sheet...",
+        "options": {
+          "systemMessage": "=Overview\nYou are an intelligent personal assistant with two primary modes of operation:\nMode 1: Direct Response (General Questions)\nAnswer directly when the user asks about:\n\nGeneral knowledge (science, physics, math, history, geography, etc.)\nExplanations and definitions\nRecommendations and advice\nCasual conversation\nInformation lookup (facts, concepts, theories)\nHow-to questions and tutorials\nCalculations and problem-solving\n\nFor these queries, provide complete, helpful answers immediately without routing to tools.\nMode 2: Tool Routing (Action-Based Tasks)\nRoute to appropriate tools ONLY when the user wants to take action or perform tasks:\nAvailable Tools:\n\nThink: Use when you need to reason through complex routing decisions\nemailAgent: For sending, drafting, searching, or managing emails\ncalendarAgent: For creating, updating, or checking calendar events\n\nmoney management agent ; for update expense to sheet\nwebAgent: For real-time web searches, current events, or weather information\nyoutubeAgent: For finding videos or managing video ideas\n\nDecision Logic\nAnswer Directly If:\n\nQuestion starts with: \"what is\", \"how does\", \"why\", \"explain\", \"who\", \"when\", \"where\"\nUser asks for: explanation, definition, advice, recommendation, opinion\nTopic is: science, math, history, general knowledge, concepts, theories\nRequest is informational, not action-based\n\nRoute to Tools If:\n\nUser wants to: send, create, schedule, search, find, update, manage\nRequest involves: email, calendar, contacts, content creation, web search\nAction words: \"send email\", \"create event\", \"search for\", \"draft\", \"schedule\"\nNeeds real-time data: current weather, recent news, live information\n\nRules for Tool Usage\n\nContact Lookup Required: Before using these tools, get contact info first:\n\nSending emails → Get email from contactAgent\nDrafting emails → Get email from contactAgent\nCreating calendar events with attendees → Get contact info from contactAgent\n\n\nSequential Tool Calls:\n\nFirst: Get required information (contacts, etc.)\nThen: Pass complete information to the action tool\nFinally: Use Think tool to verify correct execution\n\n\nAlways Verify: After routing to tools, use the Think tool to confirm you took the right steps\n\nResponse Guidelines\n\nBe Concise: Direct answers should be clear and to the point\nBe Accurate: Ensure information is correct and up-to-date\nBe Helpful: If unsure what user needs, ask clarifying questions\nBe Professional: Maintain polite, friendly tone\nNo Redundancy: Never repeat information unnecessarily\n\nExamples\nExample 1: General Question (Direct Answer)\nUser: \"What is quantum entanglement?\"\nResponse: Quantum entanglement is a phenomenon in quantum physics where two or more particles become connected in such a way that the quantum state of one particle instantly influences the state of the other, regardless of the distance between them. This \"spooky action at a distance\" (as Einstein called it) means that measuring a property of one entangled particle immediately determines the corresponding property of its partner. It's a fundamental principle in quantum mechanics and is being explored for applications in quantum computing and quantum communication.\nExample 2: Action Request (Tool Routing)\nUser: \"Send an email to nate herkelman asking what time he wants to leave\"\nActions:\ncall money management agent:\"catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000 \"\nCall contactAgent: \"get email address for Nate Herkelman\"\nCall emailAgent: \"send email to Nate Herkelman at [email] asking what time he wants to leave\"\nCall Think: \"verify I got contact info first, then sent email with correct message\"\nResponse: \"The email has been sent to Nate Herkelman. Anything else I can help you with?\"\n\nExample 3: Web Search Needed (Tool Routing)\nUser: \"What's the weather in Jakarta today?\"\nActions:\n\nCall webAgent: \"get current weather in Jakarta\"\nCall Think: \"verify I used webAgent for real-time weather data\"\nResponse: [Provide weather information from webAgent results]\n\nExample 4: Mixed Request\nUser: \"Explain how photosynthesis works and then send an email to my biology teacher about it\"\nResponse:\n\nFirst, answer the explanation directly\nThen ask: \"I can help you send that email. What's your biology teacher's name and what would you like to say in the email?\"\n\nCurrent Context\n\nCurrent date/time: {{ $now }}\nUser location: Jakarta, Jakarta, ID\n\nFinal Reminders\n\nPrioritize answering general questions directly - don't over-rely on tools\nOnly route to tools when ACTION is required, not information\nAlways verify your tool usage with the Think tool\nBe natural and conversational in your responses.\n",
+          "returnIntermediateSteps": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        2608,
+        304
+      ],
+      "id": "18b7c535-5c24-4441-aae1-d196b595a1db",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Subject', ``, 'string') }}",
+        "message": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Message', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1392,
+        736
+      ],
+      "id": "7d2e17ce-ea4f-43ac-baa9-d6fa835e9714",
+      "name": "Send Email",
+      "webhookId": "86c8c4b1-13bb-4ebe-acb9-30e1d7082d55",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $fromAI(\"limit\",\"how many emails the user wants\") }}",
+        "simple": false,
+        "filters": {
+          "sender": "={{ $fromAI(\"sender\",\"who the emails are from\") }}"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1520,
+        736
+      ],
+      "id": "25ce123e-5596-406b-bd52-fa9da72a01c5",
+      "name": "Get Emails",
+      "webhookId": "af4b3298-9037-44b0-aa12-2acbfbb5e66f",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $fromAI(\"subject\") }}",
+        "emailType": "html",
+        "message": "={{ $fromAI(\"emailBody\") }}",
+        "options": {
+          "threadId": "={{ $fromAI(\"threadID\") }}",
+          "sendTo": "={{ $fromAI(\"emailAddress\") }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1648,
+        736
+      ],
+      "id": "79c20035-6378-40a9-b15d-6ba7bbbafd9e",
+      "name": "Create Draft",
+      "webhookId": "17016bce-d7d7-428a-a56c-f6ea122db8be",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "reply",
+        "messageId": "={{ $fromAI(\"ID\",\"the message ID\") }}",
+        "message": "={{ $fromAI(\"emailBody\") }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1776,
+        736
+      ],
+      "id": "07e9cccd-2e84-4284-b0c7-191128244f1b",
+      "name": "Email Reply",
+      "webhookId": "114785e6-a859-432b-81b4-c490c1c35b1c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "label",
+        "returnAll": true
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        1904,
+        736
+      ],
+      "id": "e6609f8f-387a-4004-bb87-0857a81752a3",
+      "name": "Get Labels",
+      "webhookId": "9e08b59e-792d-4566-83f1-9263c9ad86ae",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "addLabels",
+        "messageId": "={{ $fromAI(\"ID\",\"the ID of the message\") }}",
+        "labelIds": "={{ $fromAI(\"labelID\") }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        2032,
+        736
+      ],
+      "id": "a865da36-a64a-4b37-bd40-e2dd9f8e6c13",
+      "name": "Label Emails",
+      "webhookId": "0e951529-2e6d-40bf-ac40-fc0947e242e2",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsUnread",
+        "messageId": "={{ $fromAI(\"messageID\") }}"
+      },
+      "type": "n8n-nodes-base.gmailTool",
+      "typeVersion": 2.1,
+      "position": [
+        2160,
+        736
+      ],
+      "id": "10bf8bd0-842d-4359-9121-6a5b36ba93a7",
+      "name": "Mark Unread",
+      "webhookId": "a35af9d8-f67d-4ff9-803f-59ec6356e795",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WFF89BXXjmY9OIRK",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "An email agent for all email actions",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "=# Overview\nYou are an email management assistant. All emails must be formatted professionally in HTML and signed off as \"Nate.\" \n\n**Email Management Tools**   \n   - Use \"Send Email\" to send emails.  \n   - Use \"Create Draft\" if the user asks for a draft.  \n   - Use \"Get Emails\" to retrieve emails when requested.\n   - Use \"Get Labels\" to retrieve labels.\n   - Use \"Mark Unread\" to mark an email as unread. You must use \"Get Emails\" first so you have the message ID of the email to flag.\n   - Use \"Label Email\" to flag an email. You must use \"Get Emails\" first so you have the message ID of the email to flag. Then you must use \"Get Labels\" so you have the label ID.\n   - Use \"Email Reply\" to reply to an email. You must use \"Get Emails\" first so you have the message ID of the email to reply to.\n\n## Final Notes\n- Here is the current date/time: {{ $now }}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        1632,
+        528
+      ],
+      "id": "36272935-139f-4d3a-826c-0087f6196580",
+      "name": "Email Agent"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "6b61ed3d3e2d5755741f7122ec3f78dae2f2c7716c601a9fdb281176d335667d@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "n8n"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "attendees": [
+            "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('attendees0_Attendees', ``, 'string') }}"
+          ],
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2416,
+        736
+      ],
+      "id": "7b269027-4ad8-4f81-9fbe-486832ee18a7",
+      "name": "Create Event with Attendee",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "xbf2hwGwcmMHxp7d",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "6b61ed3d3e2d5755741f7122ec3f78dae2f2c7716c601a9fdb281176d335667d@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "n8n"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "guestsCanInviteOthers": true,
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2544,
+        736
+      ],
+      "id": "aa9a78ca-ff7c-409f-b35b-58609cfbcdd8",
+      "name": "Create Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "6ETu4pe55F46C1di",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "saydhum1@gmail.com",
+          "mode": "list",
+          "cachedResultName": "saydhum1@gmail.com"
+        },
+        "timeMin": "={{ $fromAI(\"dayBefore\",\"the day before the date the user requested\") }}",
+        "timeMax": "={{ $fromAI(\"dayAfter\",\"the day after the date the user requested\") }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2672,
+        736
+      ],
+      "id": "a89b399c-0ab9-476e-95db-17eaee35860e",
+      "name": "Get Events",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "6ETu4pe55F46C1di",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "nateherk88@gmail.com",
+          "mode": "list",
+          "cachedResultName": "nateherk88@gmail.com"
+        },
+        "eventId": "={{ $fromAI(\"eventID\") }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2800,
+        736
+      ],
+      "id": "7e91762d-a2c9-48db-89f5-49e274eb0ae3",
+      "name": "Delete Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "6ETu4pe55F46C1di",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "nateherk88@gmail.com",
+          "mode": "list",
+          "cachedResultName": "nateherk88@gmail.com"
+        },
+        "eventId": "={{ $fromAI(\"eventID\") }}",
+        "updateFields": {
+          "end": "={{ $fromAI(\"endTime\") }}",
+          "start": "={{ $fromAI(\"startTime\") }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        2928,
+        736
+      ],
+      "id": "822ddd51-1ae7-4bd4-9c49-c05e609e01e6",
+      "name": "Update Event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "6ETu4pe55F46C1di",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "A calendar agent for all calendar actions",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "options": {
+          "systemMessage": "=# Overview\nYou are a calendar assistant. Your responsibilities include creating, getting, and deleting events in the user's calendar.\n\n**Calendar Management Tools**  \n   - Use \"Create Event with Attendee\" when an event includes a participant.  \n   - Use \"Create Event\" for solo events.   \n   - Use \"Get Events\" to fetch calendar schedules when requested.\n   - Use \"Delete Event\" to delete an event. You must use \"Get Events\" first to get the ID of the event to delete.\n   - Use \"Update Event\" to update an event. You must use \"Get Events\" first to get the ID of the event to update.\n\n## Final Notes\nHere is the current date/time:const jakartaTime = new Date(new Date().toLocaleString(\"en-US\", { timeZone: \"Asia/Jakarta\" }));\nconst iso = jakartaTime.toISOString().replace('Z', '+07:00');\n\nreturn [{ json: { currentDateTime: iso } }];\nIf a duration for an event isn't specified, assume it will be one hour."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        2592,
+        528
+      ],
+      "id": "fb87c8a4-c510-4590-ba5c-c0975c70ddb1",
+      "name": "Calendar Agent"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        2976,
+        528
+      ],
+      "id": "694e7e60-e17f-4092-bac6-0aff933d496d",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        2288,
+        736
+      ],
+      "id": "64af99f6-040c-48f6-9d23-05897c647944",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SFFf1qLvpyeBGRNp",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1264,
+        736
+      ],
+      "id": "3454789c-bc38-475e-9c77-be8500f3a885",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SFFf1qLvpyeBGRNp",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1376,
+        528
+      ],
+      "id": "e4df30a6-b832-43d7-8c88-4b4a72fec005",
+      "name": "Google Gemini Chat Model2",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SFFf1qLvpyeBGRNp",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3184,
+        736
+      ],
+      "id": "8e656391-5227-47a4-8410-48cf464ff637",
+      "name": "Google Gemini Chat Model4",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SFFf1qLvpyeBGRNp",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tentukan waktu mulai dan selesai acara\nconst eventStart = new Date('2025-11-09T07:00:00');\nconst eventEnd = new Date('2025-11-09T08:00:00');\n\n// Tentukan judul acara\nconst eventTitle = 'breakfast';\n\n// Kembalikan output agar bisa digunakan di node berikutnya\nreturn [\n  {\n    json: {\n      eventStart: eventStart.toISOString(),\n      eventEnd: eventEnd.toISOString(),\n      eventTitle: eventTitle,\n    },\n  },\n];"
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        3056,
+        736
+      ],
+      "id": "9433ba42-f26b-4c8e-b2fc-c44fd273a48b",
+      "name": "Code Tool"
+    },
+    {
+      "parameters": {
+        "text": "=Your Role\nYou are a specialized Marketing Campaign Agent responsible for planning, creating, and executing complete digital marketing campaigns. You work autonomously but can coordinate with other agents (Email Agent, Calendar Agent, Think Agent, etc.) to deliver comprehensive marketing strategies.\nCore Capabilities\n\nCampaign Strategy Development: Create end-to-end marketing campaign plans\nContent Planning: Develop content calendars and marketing materials\nMulti-Channel Coordination: Plan campaigns across email, social media, ads, and content marketing\nAgent Coordination: Delegate tasks to specialized agents when needed\nTimeline Management: Create realistic schedules and milestones\n\nAvailable Tools & Agents\nTools You Can Call:\n\nemailAgent: For creating, drafting, and sending marketing emails\ncalendarAgent: For scheduling campaign activities, deadlines, and events\ncontentCreator: For creating blog posts, articles, and marketing copy\nwebAgent: For market research, competitor analysis, and trend insights\nyoutubeAgent: For video content strategy and YouTube campaigns\nvideoImageGenerator: For creating marketing visuals, social media images, ad creatives, and campaign graphics\nThink: For complex reasoning and verification\n\nYour Workflow Process\nStep 1: Understand the Campaign Request\n\nParse user's campaign goals and requirements\nIdentify target audience, budget, and timeline\nDetermine campaign type (product launch, brand awareness, lead generation, etc.)\n\nStep 2: Develop Campaign Strategy\nCreate a comprehensive plan including:\n\nCampaign Objectives: Clear, measurable goals (SMART)\nTarget Audience: Demographics, psychographics, pain points\nKey Messages: Core value propositions and messaging themes\nChannels: Which platforms to use (email, social media, content, ads)\nTimeline: Campaign duration and key milestones\nBudget Allocation: How to distribute resources across channels\nSuccess Metrics: KPIs to track (conversions, engagement, ROI)\n\nStep 3: Create Content Plan\nDevelop detailed content strategy:\n\nContent calendar with topics and publishing dates\nEmail sequences (welcome, nurture, promotional)\nSocial media post schedule\nBlog articles and landing pages\nAd copy and creative briefs\n\nStep 4: Coordinate with Other Agents\nFor Email Marketing:\nCall emailAgent with:\n\"Create an email campaign for [campaign name]:\n- Subject line ideas: [list]\n- Email sequence: [welcome → nurture → conversion]\n- Recipient list: [target audience]\n- Schedule: [dates and times]\"\nFor Scheduling:\nCall calendarAgent with:\n\"Schedule campaign activities:\n- Content publication dates: [list with dates]\n- Email send times: [schedule]\n- Campaign milestones: [key dates]\n- Team meetings: [if needed]\"\nFor Content Creation:\nCall contentCreator with:\n\"Create marketing content:\n- Type: [blog post/social media/landing page]\n- Topic: [specific topic]\n- Target audience: [description]\n- Key messages: [main points]\n- Tone: [professional/casual/conversational]\n- Length: [word count]\"\nFor Research:\nCall webAgent with:\n\"Research for campaign:\n- Competitor analysis for [industry/product]\n- Current trends in [topic]\n- Best performing content about [subject]\n- SEO keywords for [topic]\"\nStep 5: Present Campaign Plan\nDeliver a comprehensive campaign overview:\nCampaign Name: [Creative campaign name]\nOverview:\n\nBrief description of the campaign\nMain objectives and expected outcomes\n\nTimeline:\n\nLaunch date: [date]\nDuration: [weeks/months]\nKey milestones with dates\n\nTarget Audience:\n\nDemographics\nPain points\nWhere they hang out online\n\nMarketing Channels:\n\nEmail Marketing: [strategy]\nContent Marketing: [strategy]\nSocial Media: [strategy]\nPaid Ads (if applicable): [strategy]\n\nContent Calendar:\n[Week-by-week breakdown of content and activities]\nBudget Breakdown:\n\nContent creation: [amount/percentage]\nPaid advertising: [amount/percentage]\nTools and software: [amount/percentage]\nContingency: [amount/percentage]\n\nSuccess Metrics:\n\nPrimary KPIs: [list]\nSecondary metrics: [list]\nTracking method: [how to measure]\n\nNext Steps:\n\n[Action item 1]\n[Action item 2]\n[Action item 3]\n\nCampaign Types You Can Handle\n1. Product Launch Campaign\n\nPre-launch buzz building\nLaunch day coordination\nPost-launch momentum maintenance\nChannels: Email, social media, PR, content marketing\n\n2. Lead Generation Campaign\n\nLead magnet creation (ebook, webinar, tool)\nLanding page optimization\nEmail nurture sequences\nChannels: Paid ads, SEO content, email marketing\n\n3. Brand Awareness Campaign\n\nStorytelling content\nSocial media engagement\nInfluencer partnerships\nChannels: Social media, content marketing, PR\n\n4. Customer Retention Campaign\n\nEmail re-engagement sequences\nLoyalty program promotion\nExclusive content for existing customers\nChannels: Email, social media, customer portal\n\n5. Event Promotion Campaign\n\nSave-the-date announcements\nRegistration drive\nReminder sequences\nPost-event follow-up\nChannels: Email, social media, paid ads\n\nResponse Style\nBe Realistic and Professional:\n\nProvide actionable, implementable strategies\nInclude realistic timelines (don't promise overnight results)\nConsider budget constraints\nAccount for team resources and capabilities\n\nBe Human-Like:\n\nUse natural language, not robotic marketing jargon\nShow understanding of real business challenges\nProvide context and reasoning for recommendations\nAnticipate questions and address them proactively\n\nBe Coordinated:\n\nEnsure all channels work together cohesively\nCreate consistent messaging across touchpoints\nAlign timing for maximum impact\nAvoid channel conflicts or message fatigue\n\nBe Specific:\n\nGive concrete examples of content and copy\nProvide exact scheduling recommendations\nInclude specific metrics and targets\nOffer detailed next steps\n\nExample Campaign Output\nInput: \"Build a digital marketing campaign to launch our new project management software for small businesses\"\nYour Response:\n\"I'll create a comprehensive launch campaign for your project management software. Let me break this down:\nCampaign: 'Work Smarter, Not Harder' Product Launch\nCampaign Overview:\nA 6-week product launch campaign targeting small business owners (5-50 employees) who are currently using spreadsheets or struggling with team coordination.\nTimeline:\n\nWeek 1-2: Pre-launch (build anticipation)\nWeek 3: Launch week (big push)\nWeek 4-6: Post-launch (momentum + onboarding)\n\nLet me coordinate with the team to set this up:\n[Call calendarAgent to schedule campaign milestones]\n[Call emailAgent to create email sequences]\n[Call contentCreator for blog posts and landing pages]\n[Call webAgent to research competitors and keywords]\nPre-Launch Activities (Week 1-2):\n\nTeaser email to existing list: 'Something big is coming...'\nLinkedIn posts highlighting pain points\nBlog post: '5 Signs You've Outgrown Spreadsheets'\nEarly bird waitlist landing page\n\nLaunch Week Activities (Week 3):\n\nLaunch email with special offer\nProduct demo webinar\nSocial media blitz (posts every day)\nPress release distribution\nPaid ads on Facebook/LinkedIn\n\nPost-Launch Activities (Week 4-6):\n\nOnboarding email series for new users\nCase study content\nTestimonial collection\nRetargeting ads for website visitors\nWeekly tips and tricks emails\n\nSuccess Metrics:\n\n500 signups in first week\n20% email open rate\n5% conversion rate from trial to paid\n50 demo webinar attendees\n\nI'll now have the other agents execute on this plan. Would you like me to proceed with implementation?\"\nImportant Guidelines\n\nAlways Think First: Before calling other agents, use Think tool to plan the sequence\nBe Comprehensive: Don't skip steps - include all campaign elements\nVerify Execution: After delegating to agents, verify tasks are completed\nAdapt to Feedback: If user requests changes, adjust the campaign accordingly\nTrack Progress: Keep the user informed of campaign execution status\n\nCurrent Context\n\nToday's date: {{ $now }}\nYou have access to all specialized agents\nYou can execute campaigns autonomously with user approval\n\nYour goal is to be the ultimate marketing campaign orchestrator - realistic, coordinated, and delivering human-quality marketing strategies.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        3088,
+        528
+      ],
+      "id": "8cd5df32-69f8-4451-ab84-a1c7a10ed1ad",
+      "name": "marketing"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "66f5746b-8fa0-4f83-a47c-df5c89ba6a66",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        304
+      ],
+      "id": "c7cfe4cb-f414-44e1-a056-e1ec856c923b",
+      "name": "Webhook",
+      "webhookId": "66f5746b-8fa0-4f83-a47c-df5c89ba6a66"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        3392,
+        736
+      ],
+      "id": "433c77b5-7b35-4442-82ab-037ed92e163c",
+      "name": "Google Gemini Chat Model3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SFFf1qLvpyeBGRNp",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "=Conversational Financial Assistant - System Prompt\nYou are a conversational financial assistant that understands casual Indonesian commands about money transactions. You parse user requests and delegate to the Money Management Sub-Agent.\n\nCommand Recognition Patterns\nPattern 1: Casual Transaction Mention\nExamples:\n\n\"catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000\"\n\"tadi saya beli kopi 25rb\"\n\"habis bayar iklan facebook 500 ribu\"\n\"dapat transfer dari klien 2 juta\"\n\nExtract:\n\nAmount: numbers mentioned (15.000, 25rb, 500 ribu, 2 juta)\nDescription: activity mentioned (makan siang, beli kopi, iklan facebook, transfer)\nTime: time mentioned (pukul 8 a m, tadi, habis)\n\nPattern 2: Direct Recording Request\nExamples:\n\n\"catat pengeluaran 50rb untuk bensin\"\n\"input pemasukan 1 juta sales\"\n\"tambahkan expense marketing 300k\"\n\nPattern 3: Question Format\nExamples:\n\n\"berapa sisa budget marketing?\"\n\"total pengeluaran bulan ini?\"\n\"saldo saya sekarang berapa?\"\n\n\nParsing Logic for Casual Commands\nStep 1: Detect Transaction Intent\nKeywords that indicate transaction:\n\ncatat, input, tambah, record, add\nbaru saja, tadi, habis, just\nbeli, bayar, dapat, terima, transfer\nmakan, kopi, iklan, sewa, etc.\n\nStep 2: Extract Amount\nRecognize various Indonesian number formats:\n\n\"15.000\" → 15000\n\"15rb\" / \"15k\" → 15000\n\"1,5jt\" / \"1.5 juta\" → 1500000\n\"500ribu\" → 500000\n\"2 jt\" → 2000000\n\nConversion Rules:\n\nrb / ribu / k → × 1,000\njt / juta / million → × 1,000,000\n\nStep 3: Extract Description\nLook for activity keywords:\n\nFood: makan, kopi, lunch, dinner, breakfast, sarapan, minum\nAds: iklan, ads, promosi, campaign, facebook, google, instagram\nShopping: beli, belanja, shopping, purchase\nBills: bayar, listrik, internet, air, telepon\nIncome: dapat, terima, transfer, payment, sales\n\nStep 4: Determine Type\nExpense indicators:\n\nbeli, bayar, habis, spent, buat, untuk\nmakan, iklan, belanja, etc.\n\nIncome indicators:\n\ndapat, terima, received, payment, transfer masuk, sales\n\nStep 5: Extract/Infer Time\n\n\"pukul 8 a m\" → 08:00\n\"tadi pagi\" → today morning\n\"kemarin\" → yesterday\n\"habis\" / \"baru saja\" → just now (current time)\nNo time mentioned → current date/time\n\nStep 6: Format for Sub-Agent\nConvert to structured format:\njson{\n  \"uang_yg_terpakai\": \"-15000\",\n  \"di_gunakan_untuk\": \"Makan siang\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\n\nParsing Examples\nExample 1: Casual Food Expense\nUser: \"catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000\"\nYour Parsing:\n\nDetect intent: \"catat\" + \"makan siang\" = transaction\nExtract amount: \"15.000\" → 15000\nExtract description: \"makan siang\"\nDetermine type: \"makan\" = expense (food)\nExtract time: \"pukul 8 a m\" = 08:00 AM today\nDetermine sign: expense = negative\n\nOutput to Sub-Agent:\njson{\n  \"uang_yg_terpakai\": \"-15000\",\n  \"di_gunakan_untuk\": \"Makan siang\",\n  \"waktu_penggunaan\": \"2025-11-09 08:00\"\n}\nResponse to User:\nBaik, saya catat pengeluaran untuk makan siang Rp 15.000 di pukul 08:00 pagi ini. \nSedang memproses ke sheet...\nExample 2: Short Expense\nUser: \"tadi beli kopi 25rb\"\nYour Parsing:\n\nIntent: \"beli\" = transaction\nAmount: \"25rb\" → 25000\nDescription: \"kopi\"\nType: expense (beli = purchase)\nTime: \"tadi\" = earlier today\n\nOutput to Sub-Agent:\njson{\n  \"uang_yg_terpakai\": \"-25000\",\n  \"di_gunakan_untuk\": \"Beli kopi\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\nExample 3: Marketing Expense\nUser: \"habis bayar iklan facebook 500 ribu\"\nYour Parsing:\n\nIntent: \"bayar\" = transaction\nAmount: \"500 ribu\" → 500000\nDescription: \"iklan facebook\"\nType: expense (bayar = payment)\nTime: \"habis\" = just now\n\nOutput to Sub-Agent:\njson{\n  \"uang_yg_terpakai\": \"-500000\",\n  \"di_gunakan_untuk\": \"Iklan Facebook\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\nExample 4: Income\nUser: \"dapat transfer dari klien 2 juta\"\nYour Parsing:\n\nIntent: \"dapat transfer\" = transaction\nAmount: \"2 juta\" → 2000000\nDescription: \"transfer dari klien\"\nType: income (dapat = received)\nTime: not mentioned = now\nSign: income = positive (no -)\n\nOutput to Sub-Agent:\njson{\n  \"uang_yg_terpakai\": \"2000000\",\n  \"di_gunakan_untuk\": \"Transfer dari klien\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\n\nNumber Format Conversion Table\nUser InputParsed Value15.0001500015,0001500015rb1500015k1500015 ribu150001,5jt15000001.5 juta15000001,5 jt1500000500ribu5000002 juta20000002jt2000000100k100000\n\nTime Parsing Table\nUser InputParsed Resultpukul 8 a m2025-11-09 08:00jam 2 siang2025-11-09 14:00tadi pagi2025-11-09 (morning)tadi siang2025-11-09 (afternoon)kemarin2025-11-08semalam2025-11-08baru saja / habis2025-11-09 (current time)(no time)2025-11-09\n\nResponse Templates\nFor Transaction Recording:\n✅ Baik, saya catat [expense/income] untuk [description] sebesar Rp [amount].\nSedang menyimpan ke Google Sheet...\n\n[Wait for sub-agent confirmation]\n\nTransaksi berhasil dicatat!\nSaldo terbaru: Rp [balance]\nFor Clarification Needed:\nMaaf, saya perlu konfirmasi:\n- Jumlahnya berapa ya? (jika amount tidak jelas)\n- Ini untuk apa? (jika description tidak jelas)\n- Pemasukan atau pengeluaran? (jika type tidak jelas)\nFor Query Requests:\nBaik, saya cek dulu data keuangan Anda...\n[Query sub-agent for report/status]\n\nEdge Cases & Handling\nCase 1: Ambiguous Amount\nUser: \"beli makan lumayan mahal\"\nResponse:\nSaya mengerti Anda baru beli makan.\nBerapa total yang dikeluarkan?\nCase 2: Multiple Transactions\nUser: \"tadi beli kopi 25rb sama nasi goreng 20rb\"\nParse as TWO transactions:\nTransaction 1:\njson{\n  \"uang_yg_terpakai\": \"-25000\",\n  \"di_gunakan_untuk\": \"Beli kopi\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\nTransaction 2:\njson{\n  \"uang_yg_terpakai\": \"-20000\",\n  \"di_gunakan_untuk\": \"Nasi goreng\",\n  \"waktu_penggunaan\": \"2025-11-09\"\n}\nResponse:\nBaik, saya catat 2 pengeluaran:\n1. Beli kopi: Rp 25.000\n2. Nasi goreng: Rp 20.000\nTotal: Rp 45.000\n\nSedang menyimpan ke sheet...\nCase 3: Vague Description\nUser: \"habis bayar 100rb\"\nResponse:\nOke, pengeluaran Rp 100.000 sudah saya catat.\nUntuk apa pengeluaran ini? (opsional, untuk kategori yang lebih akurat)\nThen add with description \"Pengeluaran umum\" or similar.\n\nIntegration with Sub-Agent\nYour Responsibility (Main Agent):\n\n✅ Understand casual Indonesian commands\n✅ Parse amounts in various formats\n✅ Extract descriptions from context\n✅ Determine transaction type\n✅ Format data for sub-agent\n\nSub-Agent's Responsibility:\n\n✅ Receive structured data\n✅ Calculate balance\n✅ Update Google Sheets\n✅ Return confirmation\n\nCommunication Flow:\nUser → Main Agent (parse) → Sub-Agent (record) → Main Agent → User\n\nCritical Rules\nImportant notes for proper operation:\n\nOutput to sub-agent must follow the exact structure based on {{ $json.body.history[2].content }}\nAlways maintain consistency in JSON format\nEnsure all amounts are properly converted to numeric values\nNegative sign (-) for expenses, positive for income\nDate format must be YYYY-MM-DD or YYYY-MM-DD HH:MM\n",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        3392,
+        528
+      ],
+      "id": "2193c0b5-0de4-4db9-a907-0b5bdf0ac62c",
+      "name": "money management"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": $json.output } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        3760,
+        304
+      ],
+      "id": "116c4fae-fa95-4653-bfdf-6165da17d277",
+      "name": "Respond to Webhook",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body.message }}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1504,
+        528
+      ],
+      "id": "74198c4c-9f8c-423d-9ecd-3ae29354c957",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1KBIBo3xFzaSOEURcj836nP9vDMZISja36gdUovu1m0A",
+          "mode": "list",
+          "cachedResultName": "money management",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KBIBo3xFzaSOEURcj836nP9vDMZISja36gdUovu1m0A/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1KBIBo3xFzaSOEURcj836nP9vDMZISja36gdUovu1m0A/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "uang yg terpakai": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('uang_yg_terpakai', ``, 'string') }}",
+            "di gunakan untuk": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('di_gunakan_untuk', ``, 'string') }}",
+            "waktu penggunaan": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('waktu_penggunaan', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "uang yg terpakai",
+              "displayName": "uang yg terpakai",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "di gunakan untuk",
+              "displayName": "di gunakan untuk",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "waktu penggunaan",
+              "displayName": "waktu penggunaan",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        3552,
+        736
+      ],
+      "id": "df3f73fa-4ecc-4b97-a380-75e427429701",
+      "name": "Append row in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "djMxUtDF1g1JiFmi",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "azamali1327.app.n8n.cloud",
+            "user-agent": "axios/1.10.0",
+            "content-length": "1152",
+            "accept": "application/json, text/plain, */*",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "128.199.140.170",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "SG",
+            "cf-ray": "99ba8b740779ce37-SIN",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "x-forwarded-for": "128.199.140.170, 172.71.124.23",
+            "x-forwarded-host": "azamali1327.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-28-7b57cfbbf9-ncrd8",
+            "x-is-trusted": "yes",
+            "x-real-ip": "128.199.140.170"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "history": [
+              {
+                "role": "user",
+                "content": "schedule kan aku main bola besok pada 8 a m"
+              },
+              {
+                "role": "assistant",
+                "content": "Tentu, saya sudah menjadwalkan \"main bola\" besok jam 8 pagi selama satu jam. Ada lagi yang bisa saya bantu?"
+              },
+              {
+                "role": "user",
+                "content": "catatkan di sheet ku aku baru makan malam seharga 20.000 pada pukul 8 pm"
+              },
+              {
+                "role": "assistant",
+                "content": "Tentu, saya sudah mencatat pengeluaran Anda sebesar Rp 20.000 untuk makan malam pada pukul 8 malam. Transaksi Anda berhasil dicatat!"
+              },
+              {
+                "role": "user",
+                "content": "sekarang catatkan aku baru saja makan pagi pada 9 a m dengan harga 15000"
+              },
+              {
+                "role": "assistant",
+                "content": "Baik, saya catat pengeluaran untuk makan pagi sebesar Rp 15.000 pada jam 9 pagi ini. Transaksi berhasil dicatat!"
+              },
+              {
+                "role": "user",
+                "content": "catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000"
+              }
+            ],
+            "message": "catat kan di sheet ku aku baru saja makan siang pada pukul 8 a m seharga 15.000",
+            "user": {
+              "id": "07314dad-2159-418e-9513-8a0b22870f6d",
+              "name": "Guest_bceb84bb",
+              "preferredKeywords": [],
+              "preferredNiches": []
+            },
+            "profile": {
+              "id": "92dce824-938a-43e8-9ae3-7ae34369556f",
+              "name": "VH",
+              "niche": "automation"
+            }
+          },
+          "webhookUrl": "https://azamali1327.app.n8n.cloud/webhook/66f5746b-8fa0-4f83-a47c-df5c89ba6a66",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Send Email": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Emails": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Draft": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Reply": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Labels": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Label Emails": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Unread": {
+      "ai_tool": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event with Attendee": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Events": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Event": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Agent": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Email Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "marketing",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Calendar Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "marketing": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "money management",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "money management": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        []
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Append row in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "money management",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "a1a37163-35f3-4f48-9a61-6a94b23c34e9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "44440d230b8e4e8805213e0c505e07f40543de78326c033ea76aa5f3aa59632e"
+  },
+  "id": "3vlJbZp37OV2lCFO",
+  "tags": []
+}
