@@ -6,6 +6,8 @@
 [![n8n](https://img.shields.io/badge/n8n-powered-blue.svg)](https://n8n.io)
 [![Google Gemini](https://img.shields.io/badge/AI-Google%20Gemini-orange.svg)](https://ai.google.dev)
 
+**Official Hackathon Website**: [https://hackathon.smartstartnow.ai/](https://hackathon.smartstartnow.ai/)
+
 ## Overview
 
 AI Agent is an intelligent personal assistant that combines multiple specialized AI agents to help you manage your daily activities. Built with n8n workflow automation and powered by Google Gemini, it understands casual Indonesian commands and can:
