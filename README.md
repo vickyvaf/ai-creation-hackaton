@@ -1,4 +1,4 @@
-# AI Agent Swarm - Intelligent Personal Assistant
+# AI Agent - Intelligent Personal Assistant
 
 > A powerful multi-agent AI system built with n8n that understands Indonesian language and manages your daily tasks through email, calendar, and financial tracking.
 
@@ -8,7 +8,7 @@
 
 ## Overview
 
-AI Agent Swarm is an intelligent personal assistant that combines multiple specialized AI agents to help you manage your daily activities. Built with n8n workflow automation and powered by Google Gemini, it understands casual Indonesian commands and can:
+AI Agent is an intelligent personal assistant that combines multiple specialized AI agents to help you manage your daily activities. Built with n8n workflow automation and powered by Google Gemini, it understands casual Indonesian commands and can:
 
 - **Send and manage emails** through Gmail
 - **Schedule and update calendar events** in Google Calendar
