@@ -308,10 +308,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Powered by [Google Gemini AI](https://ai.google.dev)
 - Inspired by the need for Indonesian language AI assistants
 
-## Demo
-
-[Add demo video or screenshots here]
-
 ## Team
 
 This project is created by:
